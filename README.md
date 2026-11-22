@@ -28,9 +28,13 @@ Press q or Ctrl-C to stop. Unplugged, wake also stops when the
 battery drops to 10%.
 ```
 
+Durations go up to 365 days.
+
+To run wake in the background, use `wake 2h </dev/null >/dev/null &` and stop it with `kill %1`. Without the redirects the shell suspends it, and the suspended caffeinate keeps the Mac awake past the timer.
+
 ## How it works
 
-wake runs `caffeinate -d -i -m -s -u -w <wake's pid>`. That stops display sleep, idle sleep, disk sleep and system sleep on AC power, and declares the user active so the screen saver and auto-lock stay off. Because caffeinate watches wake's process id, it exits when wake does, however wake ends.
+wake runs `caffeinate -d -i -m -s -u -w <wake's pid>`. While wake runs, caffeinate holds assertions that prevent display sleep, idle sleep and, on the power adapter, system sleep (`pmset -g assertions` lists them). Keeping the display awake is what is meant to stop the screen saver and the auto-lock that follows it. Because caffeinate watches wake's process id, it exits when wake does, however wake ends.
 
 The timer follows the wall clock, so time the Mac spends asleep still counts.
 

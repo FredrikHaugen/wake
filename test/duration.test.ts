@@ -23,6 +23,12 @@ test('parseDuration rejects anything that is not a positive duration', () => {
   }
 });
 
+test('parseDuration caps at 365 days and rejects overflow', () => {
+  assert.equal(parseDuration('365d'), 31_536_000_000);
+  assert.equal(parseDuration('366d'), null);
+  assert.equal(parseDuration('1'.repeat(400) + 'd'), null);
+});
+
 test('formatClock shows MM:SS under an hour and H:MM:SS above', () => {
   assert.equal(formatClock(0), '00:00');
   assert.equal(formatClock(245), '04:05');

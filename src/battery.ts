@@ -25,7 +25,7 @@ export function batteryLabel(battery: Battery | null): string {
 
 export async function readBattery(): Promise<Battery | null> {
   try {
-    const { stdout } = await execFileAsync('pmset', ['-g', 'batt']);
+    const { stdout } = await execFileAsync('pmset', ['-g', 'batt'], { timeout: 5_000 });
     return parseBattery(stdout);
   } catch {
     return null;

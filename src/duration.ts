@@ -1,6 +1,7 @@
 const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const;
 type Unit = keyof typeof UNIT_MS;
 
+const MAX_MS = 365 * UNIT_MS.d;
 const WHOLE = /^(\d+(\.\d+)?[smhd])+$/;
 const PART = /(\d+(?:\.\d+)?)([smhd])/g;
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -14,7 +15,7 @@ export function parseDuration(text: string): number | null {
     total += Number(amount) * UNIT_MS[unit as Unit];
   }
   total = Math.round(total);
-  return total > 0 ? total : null;
+  return Number.isFinite(total) && total > 0 && total <= MAX_MS ? total : null;
 }
 
 const pad = (n: number): string => String(n).padStart(2, '0');

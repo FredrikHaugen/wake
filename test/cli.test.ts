@@ -61,3 +61,20 @@ test('on a terminal it draws on the alternate screen and restores it', mac, () =
   assert.ok(log.lastIndexOf('\x1b[?25h') > entered, 'cursor shown again');
   assert.ok(log.indexOf('wake: done after 2s.') > left, 'summary printed after leaving');
 });
+
+test('pressing q on a terminal stops a long run and restores the screen', mac, () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'wake-')), 'pty.out');
+  const q = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
+  const started = Date.now();
+  const result = spawnSync(
+    'sh',
+    ['-c', `(sleep 1.5; printf q; sleep 3) | script -q ${q(file)} ${q(process.execPath)} ${q(BIN)} 20s`],
+    { stdio: 'ignore', timeout: 15_000 },
+  );
+  assert.equal(result.status, 0);
+  assert.ok(Date.now() - started < 12_000, 'stopped well before 20s');
+  const log = readFileSync(file, 'utf8');
+  const left = log.lastIndexOf('\x1b[?1049l');
+  assert.ok(left >= 0, 'left the alternate screen');
+  assert.ok(log.indexOf('wake: stopped after') > left, 'stop summary printed after leaving');
+});
