@@ -1,7 +1,8 @@
 {
   "name": "wake",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Keep this Mac awake, with a countdown that fills the terminal.",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "bin": {

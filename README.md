@@ -5,11 +5,20 @@ Keep this Mac awake, with a countdown that fills the terminal.
 ## Install
 
 ```
+brew tap fredrikhaugen/tap
+brew install wake
+```
+
+Needs macOS. Homebrew installs Node for you.
+
+### From source
+
+```
 npm install
 npm link
 ```
 
-Needs Node 24 or newer. macOS only.
+Needs Node 24 or newer. If you installed from source before and now switch to Homebrew, run `npm unlink -g wake` first, or Homebrew can't link the command.
 
 ## Usage
 
@@ -45,5 +54,15 @@ Closing the lid still puts a Mac running on battery to sleep. wake cannot preven
 ## Uninstall
 
 ```
+brew uninstall wake
+```
+
+If you installed from source:
+
+```
 npm unlink -g wake
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).
