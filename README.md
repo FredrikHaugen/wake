@@ -5,12 +5,10 @@ Keep this Mac awake, with a countdown that fills the terminal.
 ## Install
 
 ```
-brew tap fredrikhaugen/tap
-brew trust --formula fredrikhaugen/tap/wake
-brew install wake
+brew install fredrikhaugen/tap/wake
 ```
 
-Needs macOS. Homebrew installs Node for you. Homebrew asks you to trust formulae from taps outside its own, which is what the middle line does.
+Needs macOS. Homebrew installs Node for you. This taps fredrikhaugen/tap and trusts only the wake formula. After that, `brew upgrade wake` and `brew uninstall wake` work by the short name.
 
 ### From source
 
@@ -57,6 +55,8 @@ Closing the lid still puts a Mac running on battery to sleep. wake cannot preven
 ```
 brew uninstall wake
 ```
+
+To remove the tap as well, run `brew untap fredrikhaugen/tap`.
 
 If you installed from source:
 

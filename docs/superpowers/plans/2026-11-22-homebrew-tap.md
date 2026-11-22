@@ -1,5 +1,7 @@
 # Homebrew Tap Implementation Plan
 
+> **Superseded in places (2026-11-22):** Homebrew 7 refuses short-name installs from untrusted taps, so the install command is now `brew install fredrikhaugen/tap/wake` (see README.md). `brew style --fix` also reordered the formula's dependencies and replaced `Formula["node"].opt_bin` with `formula_opt_bin("node")`; the tap's Formula/wake.rb is the current version.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Anyone on a Mac can install wake with `brew tap fredrikhaugen/tap` and then `brew install wake`.
