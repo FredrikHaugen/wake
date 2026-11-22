@@ -6,10 +6,11 @@ Keep this Mac awake, with a countdown that fills the terminal.
 
 ```
 brew tap fredrikhaugen/tap
+brew trust --formula fredrikhaugen/tap/wake
 brew install wake
 ```
 
-Needs macOS. Homebrew installs Node for you.
+Needs macOS. Homebrew installs Node for you. Homebrew asks you to trust formulae from taps outside its own, which is what the middle line does.
 
 ### From source
 
