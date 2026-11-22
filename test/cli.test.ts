@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
@@ -10,8 +10,9 @@ import { displaySleepBlockedFor, waitFor } from './helpers.ts';
 const BIN = fileURLToPath(new URL('../bin/wake.js', import.meta.url));
 const mac = { skip: process.platform !== 'darwin' };
 
-function start(args: string[]) {
+function start(t: TestContext, args: string[]) {
   const child = spawn(process.execPath, [BIN, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+  t.after(() => { child.kill('SIGKILL'); });
   let stdout = '';
   child.stdout.on('data', (chunk) => { stdout += chunk; });
   const exited = new Promise<number | null>((resolve) => child.on('exit', resolve));
@@ -30,8 +31,8 @@ test('a bad duration exits 2', () => {
   assert.equal(result.stderr, 'wake: "3x" is not a duration. Try 30s, 5m, 2h or 1h30m.\n');
 });
 
-test('a 2s timer holds the display awake, then lets go', mac, async () => {
-  const w = start(['2s']);
+test('a 2s timer holds the display awake, then lets go', mac, async (t) => {
+  const w = start(t, ['2s']);
   assert.ok(await waitFor(() => displaySleepBlockedFor(w.child.pid!), 1_500));
   assert.equal(await w.exited, 0);
   const lines = w.stdout().trimEnd().split('\n');
@@ -40,8 +41,8 @@ test('a 2s timer holds the display awake, then lets go', mac, async () => {
   assert.ok(await waitFor(() => !displaySleepBlockedFor(w.child.pid!), 2_000));
 });
 
-test('SIGINT stops an open-ended run', mac, async () => {
-  const w = start([]);
+test('SIGINT stops an open-ended run', mac, async (t) => {
+  const w = start(t, []);
   assert.ok(await waitFor(() => w.stdout().includes('keeping this Mac awake'), 2_000));
   w.child.kill('SIGINT');
   assert.equal(await w.exited, 0);
