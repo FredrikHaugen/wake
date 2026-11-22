@@ -147,6 +147,13 @@ test('an error mid-run still stops caffeinate and restores the terminal', async 
   assert.deepEqual(h.events.slice(-3), ['keeper.stop', 'unsubscribe', 'leave']);
 });
 
+test('a failing terminal setup still stops caffeinate and restores the terminal', async () => {
+  const h = harness();
+  h.deps.screen = { ...h.screen, enter: () => { h.events.push('enter'); throw new Error('no tty'); } };
+  await assert.rejects(run([], h.deps), /no tty/);
+  assert.deepEqual(h.events.slice(-3), ['keeper.stop', 'unsubscribe', 'leave']);
+});
+
 test('buildView counts down with a timer and up without one', () => {
   assert.deepEqual(buildView(START + 45_500, START, START + 180_000, 3, { percent: 90, onBattery: false }), {
     clock: '02:15', caption: 'left · until 21:07', fraction: 45_500 / 180_000, tick: 3, status: 'plugged in 90% · q to stop',

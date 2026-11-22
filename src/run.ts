@@ -97,16 +97,17 @@ export async function run(argv: string[], deps: Deps): Promise<number> {
   const start = deps.now();
   const end = durationMs === null ? null : start + durationMs;
   let stopRequested = false;
-  const unsubscribe = deps.onStopRequest(() => {
-    stopRequested = true;
-  });
-
   const screen = deps.screen;
-  if (screen) screen.enter();
-  else deps.print(startMessage(durationMs, start, end));
+  let unsubscribe: (() => void) | undefined;
 
   let reason: StopReason;
   try {
+    unsubscribe = deps.onStopRequest(() => {
+      stopRequested = true;
+    });
+    if (screen) screen.enter();
+    else deps.print(startMessage(durationMs, start, end));
+
     let tick = 0;
     let lastPoll = start;
     for (;;) {
@@ -133,7 +134,7 @@ export async function run(argv: string[], deps: Deps): Promise<number> {
     }
   } finally {
     keeper.stop();
-    unsubscribe();
+    unsubscribe?.();
     screen?.leave();
   }
 
