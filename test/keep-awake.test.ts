@@ -24,7 +24,11 @@ test('caffeinate exits when wake is killed with SIGKILL', mac, async () => {
     '--input-type=module', '-e',
     `import { startKeepAwake } from ${JSON.stringify(module)}; startKeepAwake(); setInterval(() => {}, 1000);`,
   ], { stdio: 'ignore' });
-  assert.ok(await waitFor(() => displaySleepBlockedFor(child.pid!), 3_000));
-  child.kill('SIGKILL');
-  assert.ok(await waitFor(() => !displaySleepBlockedFor(child.pid!), 3_000));
+  try {
+    assert.ok(await waitFor(() => displaySleepBlockedFor(child.pid!), 3_000));
+    child.kill('SIGKILL');
+    assert.ok(await waitFor(() => !displaySleepBlockedFor(child.pid!), 3_000));
+  } finally {
+    child.kill('SIGKILL');
+  }
 });
