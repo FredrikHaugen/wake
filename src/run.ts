@@ -1,11 +1,13 @@
 import { HELP, parseArgs } from './args.ts';
 import { LOW_BATTERY_PERCENT, batteryLabel, isBatteryLow, type Battery } from './battery.ts';
 import { formatClock, formatEndTime, formatHuman } from './duration.ts';
-import { renderFrame, type View } from './frame.ts';
+import { renderDashboard, type View } from './frame.ts';
 import type { KeepAwake } from './keep-awake.ts';
+import type { Stats } from './stats.ts';
 
 export const TICK_MS = 100;
 export const BATTERY_POLL_MS = 30_000;
+export const STATS_POLL_MS = 2_000;
 
 export type StopReason = 'done' | 'stopped' | 'battery' | 'lost';
 
@@ -22,6 +24,7 @@ export type Deps = {
   now: () => number;
   wait: (ms: number) => Promise<void>;
   readBattery: () => Promise<Battery | null>;
+  readStats: () => Promise<Stats>;
   keepAwake: () => KeepAwake;
   screen: Screen | null;
   print: (line: string) => void;
@@ -110,6 +113,9 @@ export async function run(argv: string[], deps: Deps): Promise<number> {
 
     let tick = 0;
     let lastPoll = start;
+    let stats: Stats | null = null;
+    let sampling = false;
+    let lastSample = -Infinity;
     for (;;) {
       const t = deps.now();
       let found: StopReason | null = null;
@@ -126,8 +132,18 @@ export async function run(argv: string[], deps: Deps): Promise<number> {
         break;
       }
       if (screen) {
+        // Readings arrive in the background: the loop never waits on one, so a
+        // slow or hung command cannot stall the clock. Without a screen none are taken.
+        if (!sampling && t - lastSample >= STATS_POLL_MS) {
+          sampling = true;
+          lastSample = t;
+          deps.readStats().then(
+            (reading) => { stats = reading; },
+            () => { stats = null; },
+          ).finally(() => { sampling = false; });
+        }
         const { cols, rows } = screen.size();
-        screen.draw(renderFrame(buildView(t, start, end, tick, battery), cols, rows, screen.color));
+        screen.draw(renderDashboard(buildView(t, start, end, tick, battery), stats, cols, rows, screen.color));
       }
       tick += 1;
       await deps.wait(TICK_MS);

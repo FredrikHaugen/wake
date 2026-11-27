@@ -58,6 +58,7 @@ test('on a terminal it draws on the alternate screen and restores it', mac, () =
   const entered = log.indexOf('\x1b[?1049h');
   const left = log.lastIndexOf('\x1b[?1049l');
   assert.ok(entered >= 0 && left > entered, 'entered and left the alternate screen');
+  assert.ok(log.includes('memory used'), 'system panel drawn');
   assert.ok(log.lastIndexOf('\x1b[?25h') > entered, 'cursor shown again');
   assert.ok(log.indexOf('wake: done after 2s.') > left, 'summary printed after leaving');
 });

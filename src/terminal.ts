@@ -2,6 +2,7 @@ import { writeSync } from 'node:fs';
 import { readBattery } from './battery.ts';
 import { frameUpdate } from './frame.ts';
 import { startKeepAwake } from './keep-awake.ts';
+import { createStatsReader, realStatsIo } from './stats.ts';
 import type { Deps, Screen } from './run.ts';
 
 export type Out = {
@@ -71,6 +72,7 @@ export function realDeps(): Deps {
     now: Date.now,
     wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     readBattery,
+    readStats: createStatsReader(realStatsIo()),
     keepAwake: startKeepAwake,
     screen: process.stdout.isTTY ? createScreen(process.stdout, process.stdin, process.env) : null,
     print: (line) => writeLine(1, line),
