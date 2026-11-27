@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpuFraction, parseGpu, parseMemory, parseTemps } from '../src/stats.ts';
+import {
+  TEMPS_SCRIPT, cpuFraction, createStatsReader, parseGpu, parseMemory, parseTemps, realStatsIo, type StatsIo,
+} from '../src/stats.ts';
 
 const GB = 2 ** 30;
 const VM_STAT = [
@@ -71,4 +73,71 @@ test('parseTemps keeps the hottest plausible sensor of each kind', () => {
 test('parseTemps returns null when nothing usable was read', () => {
   assert.equal(parseTemps(''), null);
   assert.equal(parseTemps('PMU tdev1\t-22.0\nPMU tdie1\t0.0\nPMU tdie2\t150.0\nPMU tdie3\tnan\n'), null);
+});
+
+const outputs: Record<string, string> = { vm_stat: VM_STAT, sysctl: SWAP, ioreg: IOREG, osascript: TEMPS };
+
+function fakeIo(fail: string[] = []) {
+  const calls: string[][] = [];
+  let reads = 0;
+  const io: StatsIo = {
+    cpuTimes: () => { reads += 1; return { busy: 23 * (reads - 1), total: 100 * (reads - 1) }; },
+    totalMemory: () => 32 * GB,
+    exec: async (file, args) => {
+      calls.push([file, ...args]);
+      if (fail.includes(file)) throw new Error(`${file} failed`);
+      return outputs[file] ?? '';
+    },
+  };
+  return { io, calls, count: (file: string) => calls.filter((call) => call[0] === file).length };
+}
+
+test('a reading combines every source', async () => {
+  const f = fakeIo();
+  const read = createStatsReader(f.io);
+  assert.deepEqual(await read(), {
+    cpu: 0.23,
+    gpu: 0.48,
+    memory: parseMemory(VM_STAT, SWAP, 32 * GB),
+    temps: { chip: 64, battery: 36.3, ssd: 51 },
+  });
+  assert.deepEqual(f.calls.toSorted(), [
+    ['ioreg', '-r', '-d', '1', '-w', '0', '-c', 'IOAccelerator'],
+    ['osascript', '-l', 'JavaScript', '-e', TEMPS_SCRIPT],
+    ['sysctl', '-n', 'vm.swapusage'],
+    ['vm_stat'],
+  ]);
+});
+
+test('temperatures are read on every fifth reading and reused in between', async () => {
+  const f = fakeIo();
+  const read = createStatsReader(f.io);
+  const readings = [];
+  for (let i = 0; i < 6; i++) readings.push(await read());
+  assert.equal(f.count('osascript'), 2);
+  assert.equal(f.count('vm_stat'), 6);
+  assert.deepEqual(readings[3].temps, { chip: 64, battery: 36.3, ssd: 51 });
+  assert.equal(readings[3].cpu, 0.23);
+});
+
+test('a failing command blanks only its own rows', async () => {
+  const sensors = await createStatsReader(fakeIo(['ioreg', 'osascript']).io)();
+  assert.equal(sensors.gpu, null);
+  assert.equal(sensors.temps, null);
+  assert.equal(sensors.memory?.wired, 625249 * 16384);
+
+  const memory = await createStatsReader(fakeIo(['vm_stat']).io)();
+  assert.equal(memory.memory, null);
+  assert.equal(memory.gpu, 0.48);
+
+  const swap = await createStatsReader(fakeIo(['sysctl']).io)();
+  assert.deepEqual([swap.memory?.swapUsed, swap.memory?.swapTotal, swap.memory?.wired], [0, 0, 625249 * 16384]);
+});
+
+test('reads this Mac', { skip: process.platform !== 'darwin' }, async () => {
+  const stats = await createStatsReader(realStatsIo())();
+  assert.ok(stats.cpu >= 0 && stats.cpu <= 1);
+  assert.ok(stats.memory !== null && stats.memory.used > 0 && stats.memory.used <= stats.memory.physical);
+  assert.ok(stats.gpu === null || (stats.gpu >= 0 && stats.gpu <= 1));
+  for (const temp of Object.values(stats.temps ?? {})) assert.ok(temp === null || (temp > 0 && temp < 150));
 });

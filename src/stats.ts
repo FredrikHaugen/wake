@@ -1,3 +1,9 @@
+import { execFile } from 'node:child_process';
+import { cpus, totalmem } from 'node:os';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
 /** All sizes in bytes. `used` is app + wired + compressed. */
 export type Memory = {
   physical: number;
@@ -89,4 +95,99 @@ export function parseTemps(output: string): Temps | null {
   }
   const temps: Temps = { chip: hottest(chip), battery: hottest(battery), ssd: hottest(ssd) };
   return temps.chip === null && temps.battery === null && temps.ssd === null ? null : temps;
+}
+
+/** The slow temperature read runs on every fifth reading; the others reuse its result. */
+export const TEMPS_EVERY = 5;
+
+// JavaScript for Automation, run by osascript, which prints what run() returns:
+// one `name<TAB>celsius` line per HID temperature sensor. The IOHID calls are a
+// private API, so a Mac where they stop working simply reports no temperatures.
+export const TEMPS_SCRIPT = String.raw`ObjC.import('Foundation');
+ObjC.import('IOKit');
+ObjC.bindFunction('IOHIDEventSystemClientCreate', ['id', ['void *']]);
+ObjC.bindFunction('IOHIDEventSystemClientSetMatching', ['int', ['id', 'id']]);
+ObjC.bindFunction('IOHIDEventSystemClientCopyServices', ['id', ['id']]);
+ObjC.bindFunction('IOHIDServiceClientCopyProperty', ['id', ['id', 'id']]);
+ObjC.bindFunction('IOHIDServiceClientCopyEvent', ['id', ['id', 'long long', 'int', 'long long']]);
+ObjC.bindFunction('IOHIDEventGetFloatValue', ['double', ['id', 'int']]);
+function run() {
+  const client = $.IOHIDEventSystemClientCreate(null);
+  $.IOHIDEventSystemClientSetMatching(client, $({ PrimaryUsagePage: 0xff00, PrimaryUsage: 5 }));
+  const services = $.IOHIDEventSystemClientCopyServices(client);
+  const out = [];
+  const n = services.count;
+  for (let i = 0; i < n; i++) {
+    const s = services.objectAtIndex(i);
+    const name = ObjC.unwrap($.IOHIDServiceClientCopyProperty(s, $('Product')));
+    const ev = $.IOHIDServiceClientCopyEvent(s, 15, 0, 0);
+    if (ev.isNil && ev.isNil()) continue;
+    const t = $.IOHIDEventGetFloatValue(ev, 15 << 16);
+    out.push(name + '\t' + t.toFixed(1));
+  }
+  return out.join('\n');
+}`;
+
+export type StatsIo = {
+  cpuTimes: () => CpuTimes;
+  totalMemory: () => number;
+  /** Resolves to stdout; rejects when the command fails or times out. */
+  exec: (file: string, args: string[]) => Promise<string>;
+};
+
+/** Returns a reader that never rejects: whatever cannot be read comes back as null. */
+export function createStatsReader(io: StatsIo): () => Promise<Stats> {
+  let previous = io.cpuTimes();
+  let reads = 0;
+  let temps: Temps | null = null;
+
+  async function output(file: string, args: string[]): Promise<string | null> {
+    try {
+      return await io.exec(file, args);
+    } catch {
+      return null;
+    }
+  }
+
+  return async () => {
+    const refreshTemps = reads % TEMPS_EVERY === 0;
+    reads += 1;
+    const [vmStat, swap, ioreg, sensors] = await Promise.all([
+      output('vm_stat', []),
+      output('sysctl', ['-n', 'vm.swapusage']),
+      output('ioreg', ['-r', '-d', '1', '-w', '0', '-c', 'IOAccelerator']),
+      refreshTemps ? output('osascript', ['-l', 'JavaScript', '-e', TEMPS_SCRIPT]) : null,
+    ]);
+    if (refreshTemps) temps = sensors === null ? null : parseTemps(sensors);
+    // Measured after the commands settle, so even the first reading covers a real stretch of time.
+    const now = io.cpuTimes();
+    const cpu = cpuFraction(previous, now);
+    previous = now;
+    return {
+      cpu,
+      gpu: ioreg === null ? null : parseGpu(ioreg),
+      memory: vmStat === null ? null : parseMemory(vmStat, swap ?? '', io.totalMemory()),
+      temps,
+    };
+  };
+}
+
+export function realStatsIo(): StatsIo {
+  return {
+    cpuTimes() {
+      let busy = 0;
+      let idle = 0;
+      for (const { times } of cpus()) {
+        busy += times.user + times.nice + times.sys + times.irq;
+        idle += times.idle;
+      }
+      return { busy, total: busy + idle };
+    },
+    totalMemory: totalmem,
+    async exec(file, args) {
+      // LC_ALL=C: sysctl prints a decimal comma under some locales.
+      const { stdout } = await execFileAsync(file, args, { timeout: 5_000, env: { ...process.env, LC_ALL: 'C' } });
+      return stdout;
+    },
+  };
 }
