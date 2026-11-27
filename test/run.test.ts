@@ -211,3 +211,22 @@ test('a failed reading hides the panel and the run carries on', async () => {
   assert.equal(h.frames.at(-1)!.length, 17);
   assert.deepEqual(h.err, []);
 });
+
+test('on a terminal too small for the panel it never samples', async () => {
+  for (const [cols, rows] of [[80, 12], [80, 5], [30, 40]]) {
+    const h = harness();
+    h.deps.screen = { ...h.screen, size: () => ({ cols, rows }) };
+    assert.equal(await run(['10s'], h.deps), 0);
+    assert.equal(h.statsReads(), 0, `${cols}x${rows}`);
+  }
+});
+
+test('sampling starts once the terminal grows enough for the panel', async () => {
+  const h = harness();
+  let rows = 12;
+  h.deps.screen = { ...h.screen, size: () => ({ cols: 80, rows }) };
+  h.deps.wait = async (ms) => { h.advance(ms); if (h.elapsed() >= 3_000) rows = 24; };
+  assert.equal(await run(['5s'], h.deps), 0);
+  assert.equal(h.statsReads(), 1);
+  assert.equal(h.frames.at(-1)!.length, 24);
+});

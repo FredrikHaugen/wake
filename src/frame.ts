@@ -59,15 +59,25 @@ export function renderFrame(view: View, cols: number, rows: number, color: boole
   return compactFrame(view, cols, color);
 }
 
+const PANEL_MIN_ROWS = 3;
+
+// Rows the clock takes when the panel shows: half the terminal, never fewer than its ten.
+const clockRows = (rows: number): number => Math.max(Math.floor(rows / 2), BIG_HEIGHT);
+
+/** Whether a terminal this size can show the panel under this clock. The run loop only samples when it can. */
+export function hasPanelRoom(clock: string, cols: number, rows: number): boolean {
+  const top = clockRows(rows);
+  return rows - top >= PANEL_MIN_ROWS && fitsBig(clock, cols, top);
+}
+
 /**
  * The clock frame in the upper half and the system panel in the lower half.
  * Falls back to the clock frame alone when there is no reading yet or no room
  * for both; under twenty rows the clock keeps its ten and the panel takes the rest.
  */
 export function renderDashboard(view: View, stats: Stats | null, cols: number, rows: number, color: boolean): string[] {
-  if (stats === null) return renderFrame(view, cols, rows, color);
-  const top = Math.max(Math.floor(rows / 2), BIG_HEIGHT);
-  if (!fitsBig(view.clock, cols, top)) return renderFrame(view, cols, rows, color);
+  if (stats === null || !hasPanelRoom(view.clock, cols, rows)) return renderFrame(view, cols, rows, color);
+  const top = clockRows(rows);
   const panel = renderPanel(stats, cols, rows - top, color);
   if (panel.length === 0) return renderFrame(view, cols, rows, color);
   const clock = renderFrame(view, cols, top, color);

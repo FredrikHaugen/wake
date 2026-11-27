@@ -39,16 +39,22 @@ test('parseMemory splits memory the way Activity Monitor does', () => {
     wired,
     compressed,
     cached: (199066 + 6095) * 16384,
-    swapUsed: Math.round(8973.62 * 2 ** 20),
-    swapTotal: 10240 * 2 ** 20,
+    swap: { used: Math.round(8973.62 * 2 ** 20), total: 10240 * 2 ** 20 },
   });
 });
 
-test('parseMemory reads swap in K, M or G and treats unreadable swap as none', () => {
-  assert.equal(parseMemory(VM_STAT, 'total = 2.00G  used = 512.00K  free = 0.00M', 32 * GB)?.swapTotal, 2 * GB);
-  assert.equal(parseMemory(VM_STAT, 'total = 2.00G  used = 512.00K  free = 0.00M', 32 * GB)?.swapUsed, 512 * 1024);
-  const noSwap = parseMemory(VM_STAT, 'total = 10913,25M  used = 1,00M', 32 * GB);
-  assert.deepEqual([noSwap?.swapUsed, noSwap?.swapTotal], [0, 0]);
+test('parseMemory reads swap in K, M or G', () => {
+  const memory = parseMemory(VM_STAT, 'total = 2.00G  used = 512.00K  free = 0.00M', 32 * GB);
+  assert.deepEqual(memory?.swap, { used: 512 * 1024, total: 2 * GB });
+  assert.deepEqual(parseMemory(VM_STAT, 'total = 0.00M  used = 0.00M  free = 0.00M', 32 * GB)?.swap, { used: 0, total: 0 });
+});
+
+test('parseMemory reports swap it cannot read as missing, not as zero', () => {
+  for (const unreadable of ['', 'total = 10913,25M  used = 1,00M', 'total = 2.00G']) {
+    const memory = parseMemory(VM_STAT, unreadable, 32 * GB);
+    assert.equal(memory?.swap, null);
+    assert.equal(memory?.wired, 625249 * 16384);
+  }
 });
 
 test('parseMemory returns null when a field is missing', () => {
@@ -131,7 +137,7 @@ test('a failing command blanks only its own rows', async () => {
   assert.equal(memory.gpu, 0.48);
 
   const swap = await createStatsReader(fakeIo(['sysctl']).io)();
-  assert.deepEqual([swap.memory?.swapUsed, swap.memory?.swapTotal, swap.memory?.wired], [0, 0, 625249 * 16384]);
+  assert.deepEqual([swap.memory?.swap, swap.memory?.wired], [null, 625249 * 16384]);
 });
 
 test('reads this Mac', { skip: process.platform !== 'darwin' }, async () => {
@@ -140,4 +146,11 @@ test('reads this Mac', { skip: process.platform !== 'darwin' }, async () => {
   assert.ok(stats.memory !== null && stats.memory.used > 0 && stats.memory.used <= stats.memory.physical);
   assert.ok(stats.gpu === null || (stats.gpu >= 0 && stats.gpu <= 1));
   for (const temp of Object.values(stats.temps ?? {})) assert.ok(temp === null || (temp > 0 && temp < 150));
+});
+
+test('commands run in the C locale whatever the locale of the user', { skip: process.platform !== 'darwin' }, async (t) => {
+  const before = process.env.LC_ALL;
+  process.env.LC_ALL = 'nb_NO.UTF-8';
+  t.after(() => { if (before === undefined) delete process.env.LC_ALL; else process.env.LC_ALL = before; });
+  assert.match(await realStatsIo().exec('sysctl', ['-n', 'vm.swapusage']), /total = \d+\.\d+M/);
 });

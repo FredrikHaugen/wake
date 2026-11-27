@@ -7,7 +7,7 @@ export const fullStats: Stats = {
   gpu: 0.48,
   memory: {
     physical: 32 * GB, used: 27.5 * GB, app: 7.74 * GB, wired: 9.76 * GB, compressed: 10 * GB,
-    cached: 3.36 * GB, swapUsed: 8.78 * GB, swapTotal: 10 * GB,
+    cached: 3.36 * GB, swap: { used: 8.78 * GB, total: 10 * GB },
   },
   temps: { chip: 64, battery: 36, ssd: 51 },
 };

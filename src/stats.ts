@@ -4,7 +4,9 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-/** All sizes in bytes. `used` is app + wired + compressed. */
+export type Swap = { used: number; total: number };
+
+/** All sizes in bytes. `used` is app + wired + compressed. `swap` is null when it could not be read. */
 export type Memory = {
   physical: number;
   used: number;
@@ -12,8 +14,7 @@ export type Memory = {
   wired: number;
   compressed: number;
   cached: number;
-  swapUsed: number;
-  swapTotal: number;
+  swap: Swap | null;
 };
 
 /** Degrees Celsius; null where this Mac reports no such sensor. */
@@ -59,7 +60,6 @@ export function parseMemory(vmStat: string, swapUsage: string, physicalBytes: nu
   const app = Math.max(0, anonymous - purgeable) * page;
   const swapTotal = swapBytes(swapUsage, 'total');
   const swapUsed = swapBytes(swapUsage, 'used');
-  const swapKnown = swapTotal !== null && swapUsed !== null;
   return {
     physical: physicalBytes,
     used: app + wired * page + compressor * page,
@@ -67,8 +67,7 @@ export function parseMemory(vmStat: string, swapUsage: string, physicalBytes: nu
     wired: wired * page,
     compressed: compressor * page,
     cached: (fileBacked + purgeable) * page,
-    swapUsed: swapKnown ? swapUsed : 0,
-    swapTotal: swapKnown ? swapTotal : 0,
+    swap: swapTotal !== null && swapUsed !== null ? { used: swapUsed, total: swapTotal } : null,
   };
 }
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fitsBig, renderDashboard, renderFrame, frameUpdate, type View } from '../src/frame.ts';
+import { fitsBig, hasPanelRoom, renderDashboard, renderFrame, frameUpdate, type View } from '../src/frame.ts';
 import { bigText, renderBar, renderSweep, stripAnsi, visibleWidth } from '../src/draw.ts';
 import { renderPanel } from '../src/panel.ts';
 import type { Stats } from '../src/stats.ts';
@@ -110,6 +110,19 @@ test('no dashboard is wider or taller than the terminal, at any size', () => {
           }
         }
       }
+    }
+  }
+});
+
+test('hasPanelRoom needs the big clock and three rows under it', () => {
+  assert.equal(hasPanelRoom('03:00', 80, 13), true);
+  assert.equal(hasPanelRoom('03:00', 80, 12), false);
+  assert.equal(hasPanelRoom('03:00', 38, 24), true);
+  assert.equal(hasPanelRoom('03:00', 37, 24), false);
+  for (let cols = 1; cols <= 100; cols++) {
+    for (let rows = 1; rows <= 30; rows++) {
+      if (hasPanelRoom(timed.clock, cols, rows)) continue;
+      assert.deepEqual(renderDashboard(timed, full, cols, rows, false), renderFrame(timed, cols, rows, false), `${cols}x${rows}`);
     }
   }
 });

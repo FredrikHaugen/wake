@@ -39,18 +39,16 @@ export function buildMeters(stats: Stats): Meter[] {
   const memory = stats.memory;
   if (memory !== null) {
     const share = (bytes: number) => (memory.physical > 0 ? bytes / memory.physical : 0);
-    const hasSwap = memory.swapTotal > 0;
     add('memory', 1, 'memory used', share(memory.used), formatGb(memory.used), `of ${formatGb(memory.physical)}`);
     add('memory', 6, '  app memory', share(memory.app), formatGb(memory.app));
     add('memory', 7, '  wired memory', share(memory.wired), formatGb(memory.wired));
     add('memory', 8, '  compressed', share(memory.compressed), formatGb(memory.compressed));
     add('memory', 5, 'cached files', share(memory.cached), formatGb(memory.cached));
-    add(
-      'memory', 4, 'swap used',
-      hasSwap ? memory.swapUsed / memory.swapTotal : 0,
-      formatGb(memory.swapUsed),
-      hasSwap ? `of ${formatGb(memory.swapTotal)}` : '',
-    );
+    const swap = memory.swap;
+    if (swap !== null) {
+      const inUse = swap.total > 0;
+      add('memory', 4, 'swap used', inUse ? swap.used / swap.total : 0, formatGb(swap.used), inUse ? `of ${formatGb(swap.total)}` : '');
+    }
   }
 
   const temp = (rank: number, label: string, celsius: number | null | undefined) => {

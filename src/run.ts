@@ -1,7 +1,7 @@
 import { HELP, parseArgs } from './args.ts';
 import { LOW_BATTERY_PERCENT, batteryLabel, isBatteryLow, type Battery } from './battery.ts';
 import { formatClock, formatEndTime, formatHuman } from './duration.ts';
-import { renderDashboard, type View } from './frame.ts';
+import { hasPanelRoom, renderDashboard, type View } from './frame.ts';
 import type { KeepAwake } from './keep-awake.ts';
 import type { Stats } from './stats.ts';
 
@@ -132,9 +132,12 @@ export async function run(argv: string[], deps: Deps): Promise<number> {
         break;
       }
       if (screen) {
+        const { cols, rows } = screen.size();
+        const view = buildView(t, start, end, tick, battery);
         // Readings arrive in the background: the loop never waits on one, so a
-        // slow or hung command cannot stall the clock. Without a screen none are taken.
-        if (!sampling && t - lastSample >= STATS_POLL_MS) {
+        // slow or hung command cannot stall the clock. None are taken without a
+        // screen, or while the terminal is too small to show the panel.
+        if (!sampling && t - lastSample >= STATS_POLL_MS && hasPanelRoom(view.clock, cols, rows)) {
           sampling = true;
           lastSample = t;
           deps.readStats().then(
@@ -142,8 +145,7 @@ export async function run(argv: string[], deps: Deps): Promise<number> {
             () => { stats = null; },
           ).finally(() => { sampling = false; });
         }
-        const { cols, rows } = screen.size();
-        screen.draw(renderDashboard(buildView(t, start, end, tick, battery), stats, cols, rows, screen.color));
+        screen.draw(renderDashboard(view, stats, cols, rows, screen.color));
       }
       tick += 1;
       await deps.wait(TICK_MS);

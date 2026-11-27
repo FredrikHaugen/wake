@@ -94,8 +94,15 @@ test('rows without a reading are left out', () => {
 });
 
 test('no swap shows an empty bar and no note', () => {
-  const swap = buildMeters({ ...full, memory: { ...full.memory!, swapUsed: 0, swapTotal: 0 } }).find((m) => m.label === 'swap used')!;
+  const swap = buildMeters({ ...full, memory: { ...full.memory!, swap: { used: 0, total: 0 } } }).find((m) => m.label === 'swap used')!;
   assert.deepEqual([swap.fraction, swap.value, swap.note], [0, '0.00 GB', '']);
+});
+
+test('swap that could not be read leaves its row out', () => {
+  const labels = buildMeters({ ...full, memory: { ...full.memory!, swap: null } }).map((m) => m.label);
+  assert.deepEqual(labels.filter((label) => !label.endsWith('temp')), [
+    'cpu', 'gpu', 'memory used', '  app memory', '  wired memory', '  compressed', 'cached files',
+  ]);
 });
 
 test('colour never changes the panel layout', () => {
