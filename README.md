@@ -1,6 +1,6 @@
 # wake
 
-Keep this Mac awake, with a countdown that fills the terminal.
+Keep this Mac awake, with a countdown and a system panel that fill the terminal.
 
 ## Install
 
@@ -39,6 +39,16 @@ battery drops to 10%.
 Durations go up to 365 days.
 
 To run wake in the background, use `wake 2h </dev/null >/dev/null &` and stop it with `kill %1`. Without the redirects the shell suspends it, and the suspended caffeinate keeps the Mac awake past the timer.
+
+## System panel
+
+On a terminal with 13 rows or more, the lower half shows bars for CPU, GPU, memory and temperatures, refreshed every 2 seconds. Smaller terminals show the countdown alone, and short ones drop the least important rows first.
+
+Memory is split the way Activity Monitor splits it: memory used is app memory + wired memory + compressed, next to cached files and swap used.
+
+None of it needs sudo. CPU load comes from Node, memory from `vm_stat` and `sysctl vm.swapusage`, GPU load from `ioreg`, and temperatures from a private IOKit call made through `osascript` every 10 seconds. Temperatures are for Apple silicon: the chip, the battery and the SSD. A row this Mac cannot report is left out.
+
+In the background or piped, wake reads none of this.
 
 ## How it works
 
