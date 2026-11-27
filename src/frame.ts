@@ -1,4 +1,4 @@
-import { GRADIENT, bigText, dim, paint, renderBar, renderSweep } from './draw.ts';
+import { GRADIENT, bigText, colourBar, dim, paint, renderBar, renderSweep } from './draw.ts';
 
 export type View = {
   clock: string;
@@ -12,34 +12,6 @@ const BIG_HEIGHT = 10;
 
 function percent(fraction: number): string {
   return Math.floor(fraction * 100) + '%';
-}
-
-// Colours a bar or sweep by runs of cells: filled cells take their gradient
-// colour, the comet takes the last one, and the `░` track is dimmed.
-function colourBar(bar: string, fraction: number | null, color: boolean): string {
-  if (!color) return bar;
-  const cells = [...bar];
-  let out = '';
-  let run = '';
-  let runKey: number | null = null;
-  const flush = () => {
-    if (run === '') return;
-    out += runKey === null ? dim(run, true) : paint(run, runKey, true);
-    run = '';
-  };
-  cells.forEach((cell, i) => {
-    const key =
-      cell === '░'
-        ? null
-        : fraction === null
-          ? GRADIENT[GRADIENT.length - 1]
-          : GRADIENT[Math.floor((i * GRADIENT.length) / cells.length)];
-    if (key !== runKey) flush();
-    runKey = key;
-    run += cell;
-  });
-  flush();
-  return out;
 }
 
 function makeBar(view: View, width: number, color: boolean): string {

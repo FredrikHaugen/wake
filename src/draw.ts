@@ -40,6 +40,34 @@ export function renderSweep(tick: number, width: number): string {
   return line;
 }
 
+// Colours a bar or sweep by runs of cells: filled cells take their gradient
+// colour, the comet takes the last one, and the `░` track is dimmed.
+export function colourBar(bar: string, fraction: number | null, color: boolean): string {
+  if (!color) return bar;
+  const cells = [...bar];
+  let out = '';
+  let run = '';
+  let runKey: number | null = null;
+  const flush = () => {
+    if (run === '') return;
+    out += runKey === null ? dim(run, true) : paint(run, runKey, true);
+    run = '';
+  };
+  cells.forEach((cell, i) => {
+    const key =
+      cell === '░'
+        ? null
+        : fraction === null
+          ? GRADIENT[GRADIENT.length - 1]
+          : GRADIENT[Math.floor((i * GRADIENT.length) / cells.length)];
+    if (key !== runKey) flush();
+    runKey = key;
+    run += cell;
+  });
+  flush();
+  return out;
+}
+
 const FONT: Record<string, string[]> = {
   '0': ['###', '#.#', '#.#', '#.#', '###'],
   '1': ['.#.', '##.', '.#.', '.#.', '###'],
