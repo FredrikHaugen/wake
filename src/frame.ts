@@ -1,4 +1,6 @@
 import { GRADIENT, bigText, colourBar, dim, paint, renderBar, renderSweep } from './draw.ts';
+import { renderPanel } from './panel.ts';
+import type { Stats } from './stats.ts';
 
 export type View = {
   clock: string;
@@ -47,10 +49,29 @@ function compactFrame(view: View, cols: number, color: boolean): string[] {
   return [(' ' + view.clock).slice(0, Math.max(0, cols - 1))];
 }
 
+/** Whether the big clock layout fits: its ten rows, and the digits with a two-cell margin each side. */
+export function fitsBig(clock: string, cols: number, rows: number): boolean {
+  return rows >= BIG_HEIGHT && cols >= bigText(clock)[0].length + 4;
+}
+
 export function renderFrame(view: View, cols: number, rows: number, color: boolean): string[] {
-  const big = bigText(view.clock);
-  if (rows >= BIG_HEIGHT && cols >= big[0].length + 4) return bigFrame(view, big, cols, rows, color);
+  if (fitsBig(view.clock, cols, rows)) return bigFrame(view, bigText(view.clock), cols, rows, color);
   return compactFrame(view, cols, color);
+}
+
+/**
+ * The clock frame in the upper half and the system panel in the lower half.
+ * Falls back to the clock frame alone when there is no reading yet or no room
+ * for both; under twenty rows the clock keeps its ten and the panel takes the rest.
+ */
+export function renderDashboard(view: View, stats: Stats | null, cols: number, rows: number, color: boolean): string[] {
+  if (stats === null) return renderFrame(view, cols, rows, color);
+  const top = Math.max(Math.floor(rows / 2), BIG_HEIGHT);
+  if (!fitsBig(view.clock, cols, top)) return renderFrame(view, cols, rows, color);
+  const panel = renderPanel(stats, cols, rows - top, color);
+  if (panel.length === 0) return renderFrame(view, cols, rows, color);
+  const clock = renderFrame(view, cols, top, color);
+  return [...clock, ...Array.from({ length: top - clock.length }, () => ''), ...panel];
 }
 
 export function frameUpdate(prev: string[] | null, next: string[]): string {

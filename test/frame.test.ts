@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderFrame, frameUpdate, type View } from '../src/frame.ts';
+import { fitsBig, renderDashboard, renderFrame, frameUpdate, type View } from '../src/frame.ts';
 import { bigText, renderBar, renderSweep, stripAnsi, visibleWidth } from '../src/draw.ts';
+import { renderPanel } from '../src/panel.ts';
+import type { Stats } from '../src/stats.ts';
+import { fullStats as full } from './helpers.ts';
 
 const timed: View = { clock: '03:00', caption: 'left · until 21:07', fraction: 0.42, tick: 0, status: 'plugged in 90% · q to stop' };
 const open: View = { clock: '12:34', caption: 'awake · until you stop it', fraction: null, tick: 7, status: 'q to stop' };
@@ -62,4 +65,51 @@ test('frameUpdate redraws everything the first time and when the line count chan
 test('frameUpdate rewrites only the lines that changed', () => {
   assert.equal(frameUpdate(['a', 'b'], ['a', 'b']), '');
   assert.equal(frameUpdate(['a', 'b', 'c'], ['a', 'x', 'y']), '\x1b[2;1Hx\x1b[K\x1b[3;1Hy\x1b[K');
+});
+
+test('fitsBig needs ten rows and the clock width plus margins', () => {
+  assert.equal(fitsBig('03:00', 38, 10), true);
+  assert.equal(fitsBig('03:00', 37, 10), false);
+  assert.equal(fitsBig('03:00', 80, 9), false);
+  assert.equal(fitsBig('1:00:00', 49, 24), false);
+});
+
+test('the dashboard gives the clock the upper half and the panel the lower', () => {
+  const lines = renderDashboard(timed, full, 80, 24, false);
+  assert.equal(lines.length, 24);
+  assert.deepEqual(lines.slice(0, 11), renderFrame(timed, 80, 12, false));
+  assert.equal(lines[11], '');
+  assert.deepEqual(lines.slice(12), renderPanel(full, 80, 12, false));
+});
+
+test('under twenty rows the clock keeps its ten and the panel takes the rest', () => {
+  const lines = renderDashboard(timed, full, 80, 14, false);
+  assert.deepEqual(lines.slice(0, 10), renderFrame(timed, 80, 10, false));
+  assert.deepEqual(lines.slice(10), renderPanel(full, 80, 4, false));
+  assert.equal(renderDashboard(timed, full, 80, 13, false).length, 13);
+});
+
+test('the dashboard is the plain frame when there is no reading or no room', () => {
+  assert.deepEqual(renderDashboard(timed, null, 80, 24, false), renderFrame(timed, 80, 24, false));
+  assert.deepEqual(renderDashboard(timed, full, 80, 12, false), renderFrame(timed, 80, 12, false));
+  assert.deepEqual(renderDashboard(timed, full, 30, 24, false), renderFrame(timed, 30, 24, false));
+  assert.deepEqual(renderDashboard(open, full, 37, 24, false), renderFrame(open, 37, 24, false));
+});
+
+test('no dashboard is wider or taller than the terminal, at any size', () => {
+  const long: View = { ...timed, clock: '100:00:00', caption: 'left · until Mon 09:15' };
+  const bare: Stats = { cpu: 1, gpu: null, memory: null, temps: null };
+  for (const view of [timed, open, long]) {
+    for (const stats of [full, bare]) {
+      for (let cols = 1; cols <= 160; cols++) {
+        for (let rows = 1; rows <= 40; rows++) {
+          const lines = renderDashboard(view, stats, cols, rows, true);
+          assert.ok(lines.length <= rows, `${cols}x${rows}: ${lines.length} lines`);
+          for (const line of lines) {
+            assert.ok(visibleWidth(line) <= cols - 1, `${cols}x${rows}: ${JSON.stringify(stripAnsi(line))}`);
+          }
+        }
+      }
+    }
+  }
 });
